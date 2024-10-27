@@ -1,47 +1,58 @@
 name: CI
-on: [push]
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # Событие для тегов
 
 jobs:
-    build:
-        name: Ubuntu2204 gcc
-        runs-on: ubuntu-22.04
-        env:
-            CC: gcc
-            CXX: gcc
-        steps:
-            - uses: actions/checkout@v3
-            - run: |
-                  sudo apt-get update
-                  sudo apt-get install -y cmake libssl-dev g++
+  build:
+    name: Ubuntu2204 gcc
+    runs-on: ubuntu-22.04
+    env:
+      CC: gcc
+      CXX: gcc
+    steps:
+      - uses: actions/checkout@v3
+      - run: sudo apt update
+      - run: sudo apt install -y cmake
+      - run: sudo apt install -y libssl-dev
+      - run: sudo apt install -y g++
 
-            - run: mkdir ./lab_3/client/build/
-            - run: mkdir ./lab_3/server/build/
+      - run: mkdir ./client/build/
+      - run: mkdir ./server/build/
 
-            - run: cd lab_3/server/build/ && cmake ../ && make -j
-            - run: cd lab_3/client/build/ && cmake ../ && make -j
-            
-            - run: cd lab_3 && sh create_debpkg.sh client && sh create_debpkg.sh server  
-            - name: Upload artifact_client
-              uses: actions/upload-artifact@v3
-              with:
-                name: app_client
-                path: lab_3/http-client-dsca.deb
-            - name: Upload artifact_server
-              uses: actions/upload-artifact@v3
-              with:
-                name: app_server
-                path: lab_3/http-server-dsca.deb
-    release:
-        name: Ubuntu2204 gcc upload release
-        runs-on: ubuntu-22.04
-        permissions:
-            contents: write
-        needs: build
-        steps:
-            - uses: actions/download-artifact@v3
-              with:
-                name: app_client
-                path: lab_3/http-client-dsca.deb
-            - uses: ncipollo/release-action@v1
-              with:
-                artifacts: app_client
+      - run: cd server/build/ && cmake ../ && make -j
+      - run: cd client/build/ && cmake ../ && make -j
+
+      - run: sh create_debpkg.sh client && sh create_debpkg.sh server
+      - name: Upload artifact_client
+        uses: actions/upload-artifact@v3
+        with:
+          name: app_client
+          path: http-client-dsca.deb
+      - name: Upload artifact_server
+        uses: actions/upload-artifact@v3
+        with:
+          name: app_server
+          path: http-server-dsca.deb
+
+  release:
+    name: Ubuntu2204 gcc upload release
+    runs-on: ubuntu-22.04
+    permissions:
+        contents: write
+    needs: build
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Убедитесь, что все теги доступны
+      - uses: actions/download-artifact@v3
+        with:
+          name: app_client
+          path: http-client-dsca.deb
+      - uses: ncipollo/release-action@v1
+        with:
+          artifacts: http-client-dsca.deb
+          tag: ${{ github.ref_name }} # Использует имя текущего тега
+          token: ${{ secrets.GITHUB_TOKEN }}
