@@ -37,6 +37,37 @@ jobs:
           name: app_server
           path: http-server-dsca.deb
 
+  docker:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-22.04
+    needs: build
+    steps:
+      - uses: actions/checkout@v3
+
+      # Сборка Docker-образа для сервера
+      - name: Build Docker Image for Server
+        run: |
+          docker build -t my-repo/server:latest -f server/Dockerfile .
+
+      # Сборка Docker-образа для клиента
+      - name: Build Docker Image for Client
+        run: |
+          docker build -t my-repo/client:latest -f client/Dockerfile .
+
+      # Аутентификация в Docker Hub (или другом реестре)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # Загрузка Docker-образов
+      - name: Push Server Image
+        run: docker push my-repo/server:latest
+
+      - name: Push Client Image
+        run: docker push my-repo/client:latest
+
   release:
     name: Ubuntu2204 gcc upload release
     runs-on: ubuntu-22.04
