@@ -18,7 +18,8 @@ jobs:
       - run: sudo apt install -y cmake
       - run: sudo apt install -y libssl-dev
       - run: sudo apt install -y g++
-
+      - run: sudo apt install -y libpq-dev
+      - run: sudo apt install -y libpqxx-dev
       - run: mkdir ./client/build/
       - run: mkdir ./server/build/
 

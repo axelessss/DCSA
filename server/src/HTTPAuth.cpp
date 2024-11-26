@@ -4,12 +4,12 @@
 bool HTTPAuth::Basic(HttpRequest *req, UserService& userService)
 {
     auto basic_auth = req->GetHeader("Authorization");
-    
+
     if (basic_auth.empty())
     {
         throw std::invalid_argument("empty header");
     }
-    
+
     auto splited_header = base64::Split(basic_auth, " ");
 
     if (splited_header.size() != 2)
@@ -22,7 +22,7 @@ bool HTTPAuth::Basic(HttpRequest *req, UserService& userService)
 
     if (splited_auth.size() != 2)
         throw std::invalid_argument("Decoding error");
-    
+
     auto header_login = splited_auth[0];
     auto header_password = splited_auth[1];
 
@@ -30,13 +30,15 @@ bool HTTPAuth::Basic(HttpRequest *req, UserService& userService)
     std::cout << header_password;
 
     auto id = req->GetParam("Id");
-    
-    auto header_user = userService.GetByLogin(header_login);
-    
-    if ((header_password == header_user.Password && id == header_user.Id) || userService.IsAdmin(header_user))
+    User header_user;
+
+    if (userService.GetByLogin(header_login, header_user))
     {
-        return true;
+        if ((header_password == header_user.Password && id == header_user.Id) || header_user.isAdmin)
+        {
+            return true;
+        }
     }
+
     return false;
-  
 }

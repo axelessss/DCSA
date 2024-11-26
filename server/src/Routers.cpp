@@ -1,25 +1,39 @@
-#include "HTTPAuth.hpp"
 #include "Routers.hpp"
 #include "User.hpp"
 #include "base64/Base64.hpp"
+#include "HTTPAuth.hpp"
 
-void route::RegisterResources(hv::HttpService &router)
+void route::RegisterResources(hv::HttpService &router, UserService &database)
 {
-    router.GET("/user/{Id}", [](HttpRequest *req, HttpResponse *resp)
+    router.GET("/user/{Id}", [&database](HttpRequest *req, HttpResponse *resp)
     {
         try
         {
-            auto user = UserService::Instance().Get(req->GetParam("Id"));
-            nlohmann::json response
+            User user;
+            if (database.Get(req->GetParam("Id"), user))
             {
-                {"Login", user.Login},
-                {"Id", user.Id}
-            };
+                nlohmann::json response
+                {
+                    {"Login", user.Login},
+                    {"Id", user.Id},
+                    {"isAdmin", user.isAdmin}
+                };
 
-            resp->SetBody(response.dump());
-            resp->content_type = APPLICATION_JSON;
-            resp->status_code = HTTP_STATUS_OK;
+                resp->SetBody(response.dump());
+                resp->content_type = APPLICATION_JSON;
+                resp->status_code = HTTP_STATUS_OK;
+            }
+            else
+            {
+                nlohmann::json response
+                {
+                    {"Error", "User not found"}
+                };
 
+                resp->SetBody(response.dump());
+                resp->content_type = APPLICATION_JSON;
+                resp->status_code = HTTP_STATUS_BAD_REQUEST;
+            }
         }
         catch(const std::invalid_argument& invalid)
         {
@@ -33,21 +47,21 @@ void route::RegisterResources(hv::HttpService &router)
         return resp->status_code;
     });
 
-    router.GET("/users", [](HttpRequest *req, HttpResponse *resp)
+    router.GET("/users", [&database](HttpRequest *req, HttpResponse *resp)
     {
-        std::cout << "2eqw";
         try
         {
-            auto users = UserService::Instance().Get();
+            auto users = database.Get();
 
             nlohmann::json responseArray;
 
-            for(const auto& user : users) 
+            for (const auto &user : users)
             {
                 nlohmann::json userJson
                 {
                     {"Login", user.Login},
-                    {"Id", user.Id}
+                    {"Id", user.Id},
+                    {"isAdmin", user.isAdmin}
                 };
                 responseArray.push_back(userJson);
             }
@@ -67,21 +81,27 @@ void route::RegisterResources(hv::HttpService &router)
         return resp->status_code;
     });
 
-    router.POST("/user", [](HttpRequest *req, HttpResponse *resp)
+    router.POST("/user", [&database](HttpRequest *req, HttpResponse *resp)
     {
         nlohmann::json request;
         nlohmann::json response;
         resp->status_code = HTTP_STATUS_BAD_REQUEST;
         resp->content_type = APPLICATION_JSON;
+
         try
         {
             request = nlohmann::json::parse(req->body);
-            auto user = UserService::Instance().Create(request["Login"], request["Password"]);
-            response =
+            std::string id = database.Create(request["Login"], request["Password"], request["isAdmin"]);
+            if (id != "null")
             {
-                {"Login", user.Login},
-                {"Id", user.Id}
-            };
+                response =
+                {
+                    {"Login", request["Login"]},
+                    {"Id", id},
+                    {"isAdmin", request["isAdmin"]}
+                };
+                resp->status_code = HTTP_STATUS_OK;
+            }
 
             resp->SetBody(response.dump());
             resp->status_code = HTTP_STATUS_OK;
@@ -92,10 +112,11 @@ void route::RegisterResources(hv::HttpService &router)
             response["error"] = "Invalid JSON";
             resp->SetBody(response.dump());
         }
+
         return resp->status_code;
     });
 
-    router.Delete("/user/{Id}", [](HttpRequest *req, HttpResponse *resp)
+    router.Delete("/user/{Id}", [&database](HttpRequest *req, HttpResponse *resp)
     {
         nlohmann::json response;
         resp->content_type = APPLICATION_JSON;
@@ -103,7 +124,7 @@ void route::RegisterResources(hv::HttpService &router)
 
         try
         {
-            if (HTTPAuth::Basic(req,UserService::Instance()) && UserService::Instance().Remove(req->GetParam("Id")))
+            if (HTTPAuth::Basic(req, database) && database.Remove(req->GetParam("Id")))
             {
                 resp->status_code = HTTP_STATUS_OK;
                 response["Id"] = req->GetParam("Id");
@@ -119,25 +140,25 @@ void route::RegisterResources(hv::HttpService &router)
         {
             response["Error"] = ex.what();
             response["Success"] = "false";
-        } 
+        }
 
         resp->SetBody(response.dump());
         return resp->status_code;
     });
 
-    router.PATCH("/user/{Id}", [](HttpRequest *req, HttpResponse *resp)
+    router.PATCH("/user/{Id}", [&database](HttpRequest *req, HttpResponse *resp)
     {
         nlohmann::json response;
         resp->content_type = APPLICATION_JSON;
         resp->status_code = HTTP_STATUS_BAD_REQUEST;
-        
+
         try
         {
-            if (HTTPAuth::Basic(req,UserService::Instance()))
+            if (HTTPAuth::Basic(req, database))
             {
                 nlohmann::json request = nlohmann::json::parse(req->body);
                 User user = {req->GetParam("Id"), request["Login"], request["Password"]};
-                UserService::Instance().Update(user);
+                database.Update(user);
                 response =
                 {
                     {"Login", user.Login},
@@ -154,7 +175,7 @@ void route::RegisterResources(hv::HttpService &router)
         catch(const std::exception& ex)
         {
             response["Error"] = ex.what();
-        } 
+        }
         return resp->status_code;
     });
 }

@@ -4,46 +4,35 @@
 #include <mutex>
 #include <vector>
 #include <unordered_map>
+#include <pqxx/pqxx>
+#include "Base64.hpp"
 
 struct User final
 {
     std::string Id;
     std::string Login;
     std::string Password;
-
+    bool isAdmin;
     void update_data(User user);
 };
 
 class UserService
 {
 private:
-    std::unordered_map<std::string, User> _users;
-    std::vector<std::string> _admin_list;
     std::mutex ServiceMutex;
-    UserService();
+    pqxx::connection _conn;
 
 public:
-    static UserService& Instance() 
-    {
-        static UserService instance;
-        return instance;
-    }
-    
-    User Create(std::string Login,std::string Password);
-    User Update(User user);
-    User Get(std::string Id);
-    User GetByLogin(std::string Login);
+    UserService(const std::string& connInfo);
+
+    std::string Create(std::string Login, std::string Password, bool isAdmin);
+    bool Update(const User& user);
+    bool Get(std::string Id, User& user);
+    bool GetByLogin(std::string Login, User& user);
     std::vector<User> Get();
-    bool Remove(std::string Id); 
-    bool Remove(User User) 
+    bool Remove(std::string Id);
+    bool Remove(User User)
     {
         return Remove(User.Id);
-    }
-
-
-    bool IsAdmin(std::string Id);
-    bool IsAdmin(User User)  
-    {
-        return IsAdmin(User.Id);
     }
 };

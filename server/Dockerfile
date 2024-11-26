@@ -14,7 +14,7 @@ COPY ./server /app/server
 
 # Сборка
 WORKDIR /app/server
-RUN mkdir build && cd build && cmake .. && make -j
+RUN mkdir build && cd build && cmake .. && make clean && make -j
 
 # Копируем скомпилированный файл
 RUN cp ./build/libhv-http /usr/local/bin/http-server
